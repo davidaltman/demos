@@ -9,6 +9,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 
+"""
+This script implements an image compression and transfer system using a Variational Autoencoder (VAE)
+and MQTT protocol. It includes both a broker and a client for sending and receiving compressed images.
+"""
+
 # MQTT settings
 broker_address = "localhost"
 port = 1883
@@ -27,6 +32,13 @@ batch_size = 32
 num_epochs = 50
 
 class VAE(nn.Module):
+    """
+    Variational Autoencoder (VAE) model for image compression.
+
+    This VAE uses convolutional layers in the encoder and transposed convolutional layers in the decoder.
+    It's designed to work with color images of size 256x256 pixels.
+    """
+
     def __init__(self):
         super(VAE, self).__init__()
         self.encoder = nn.Sequential(
@@ -58,23 +70,37 @@ class VAE(nn.Module):
         )
 
     def encode(self, x):
+        """Encode the input into the latent space."""
         h = self.encoder(x)
         return self.fc_mu(h), self.fc_logvar(h)
 
     def reparameterize(self, mu, logvar):
+        """Reparameterization trick to sample from N(mu, var) from N(0,1)."""
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
 
     def decode(self, z):
+        """Decode the latent representation back to image space."""
         return self.decoder(z)
 
     def forward(self, x):
+        """Forward pass through the VAE."""
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
 def compress_image(image_path: str, model: VAE) -> bytes:
+    """
+    Compress an image using the VAE model.
+
+    Args:
+    image_path (str): Path to the input image
+    model (VAE): Trained VAE model
+
+    Returns:
+    bytes: Compressed image data
+    """
     transform = transforms.Compose([
         transforms.Resize((input_dim, input_dim)),
         transforms.ToTensor()
@@ -92,6 +118,16 @@ def compress_image(image_path: str, model: VAE) -> bytes:
     return compressed_bytes.getvalue()
 
 def decompress_image(compressed_data: bytes, model: VAE) -> Image.Image:
+    """
+    Decompress image data using the VAE model.
+
+    Args:
+    compressed_data (bytes): Compressed image data
+    model (VAE): Trained VAE model
+
+    Returns:
+    Image.Image: Decompressed image
+    """
     compressed_tensor = torch.load(io.BytesIO(compressed_data), map_location=torch.device('cpu'))
     model.eval()
     with torch.no_grad():
@@ -102,6 +138,9 @@ def decompress_image(compressed_data: bytes, model: VAE) -> Image.Image:
     return decompressed_image
 
 def run_broker():
+    """
+    Run the MQTT broker to send compressed images.
+    """
     ack_received = False
 
     def on_connect(client, userdata, flags, rc, properties=None):
@@ -151,6 +190,9 @@ def run_broker():
         client.disconnect()
 
 def run_client():
+    """
+    Run the MQTT client to receive and decompress images.
+    """
     def on_connect(client, userdata, flags, rc, properties=None):
         print(f"Client connected with result code {rc}")
         client.subscribe(topic)

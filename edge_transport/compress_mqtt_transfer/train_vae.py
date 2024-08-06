@@ -6,6 +6,11 @@ from torchvision import transforms, datasets
 import os
 import multiprocessing
 
+"""
+This script trains a Variational Autoencoder (VAE) for image compression using PyTorch.
+The VAE is trained on a dataset of blood cell images and can be used for efficient image transfer or storage.
+"""
+
 # VAE parameters
 input_dim = 256
 latent_dim = 6144
@@ -28,8 +33,14 @@ else:
 
 print(f"Using device: {device}")
 
-# VAE model definition
 class VAE(nn.Module):
+    """
+    Variational Autoencoder (VAE) model for image compression.
+
+    This VAE uses convolutional layers in the encoder and transposed convolutional layers in the decoder.
+    It's designed to work with color images of size 256x256 pixels.
+    """
+
     def __init__(self):
         super(VAE, self).__init__()
         self.encoder = nn.Sequential(
@@ -61,30 +72,53 @@ class VAE(nn.Module):
         )
 
     def encode(self, x):
+        """Encode the input into the latent space."""
         h = self.encoder(x)
         return self.fc_mu(h), self.fc_logvar(h)
 
     def reparameterize(self, mu, logvar):
+        """Reparameterization trick to sample from N(mu, var) from N(0,1)."""
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return mu + eps * std
 
     def decode(self, z):
+        """Decode the latent representation back to image space."""
         return self.decoder(z)
 
     def forward(self, x):
+        """Forward pass through the VAE."""
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
-# Loss function
 def loss_function(recon_x, x, mu, logvar):
+    """
+    Computes the VAE loss function.
+
+    Args:
+    recon_x (Tensor): The reconstructed input
+    x (Tensor): The original input
+    mu (Tensor): The mean of the latent Gaussian
+    logvar (Tensor): The log variance of the latent Gaussian
+
+    Returns:
+    Tensor: The total loss (reconstruction loss + KL divergence)
+    """
     BCE = nn.functional.binary_cross_entropy(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     return BCE + KLD
 
-# Training loop
 def train(model, train_loader, optimizer, device):
+    """
+    Trains the model for one epoch.
+
+    Args:
+    model (nn.Module): The VAE model
+    train_loader (DataLoader): DataLoader for the training data
+    optimizer (Optimizer): The optimizer for the model
+    device (torch.device): The device to train on
+    """
     model.train()
     train_loss = 0
     for batch_idx, (data, _) in enumerate(train_loader):
@@ -102,6 +136,9 @@ def train(model, train_loader, optimizer, device):
     print(f'====> Average loss: {train_loss / len(train_loader.dataset):.4f}')
 
 def main():
+    """
+    Main function to prepare data, initialize model, and run the training loop.
+    """
     # Data preparation
     transform = transforms.Compose([
         transforms.Resize((input_dim, input_dim)),
