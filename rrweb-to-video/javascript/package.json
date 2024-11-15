@@ -1,0 +1,12 @@
+{
+  "name": "rrweb-to-video",
+  "version": "1.0.0",
+  "description": "Convert RRWeb recordings to video files",
+  "main": "run.js",
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  },
+  "scripts": {
+    "start": "node run.js"
+  }
+}
