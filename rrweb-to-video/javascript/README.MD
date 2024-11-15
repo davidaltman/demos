@@ -22,12 +22,12 @@ You can use this utility in two ways:
 
 node run.js <input-json-path.json>
 
-## output file is named <input-json-path.webm>
+#### output file is named <input-json-path.webm>
 
 Example:
 node run.js ./recordings/session.json
 
-## output file is ./recordings/session.webm
+#### output file is ./recordings/session.webm
 
 
 ### 2. Programmatic Usage
