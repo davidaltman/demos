@@ -43,7 +43,7 @@ The script will exit with an error message if:
 - Any conversion errors occur during processing
 
 ## Example
-ash
+
 python run.py recordings/session1.json
 
 
