@@ -34,7 +34,8 @@ async function convertRRWebToVideo(jsonPath, outputPath) {
   const events = fileContent.data.snapshots;
   console.log('Number of snapshots found:', events.length);
 
-  // Create a simple HTML page with rrweb-player
+  // ... existing code ...
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -43,8 +44,25 @@ async function convertRRWebToVideo(jsonPath, outputPath) {
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css" />
         <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
         <style>
-          body { margin: 0; }
-          #player { width: 100%; height: 100vh; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+          }
+          #player {
+            width: 100vw;
+            height: 100vh;
+          }
+          .rr-player {
+            width: 100% !important;
+            height: 100% !important;
+          }
+          .rr-player__frame {
+            width: 100% !important;
+            height: calc(100% - 80px) !important;
+          }
         </style>
       </head>
       <body>
@@ -57,15 +75,18 @@ async function convertRRWebToVideo(jsonPath, outputPath) {
               data: {
                 events,
                 autoPlay: true,
+                width: window.innerWidth,
+                height: window.innerHeight,
               }
             });
-            // Signal that player is ready
             window.playerReady = true;
           });
         </script>
       </body>
     </html>
   `;
+
+// ... existing code ...
 
   // Write temporary HTML file
   const tempHtml = path.join(__dirname, 'temp.html');

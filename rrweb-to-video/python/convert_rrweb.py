@@ -27,31 +27,50 @@ class RRWebConverter:
         return f"""
         <!DOCTYPE html>
         <html>
-          <head>
+        <head>
             <title>RRWeb Playback</title>
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/style.css"/>
             <script src="https://cdn.jsdelivr.net/npm/rrweb-player@latest/dist/index.js"></script>
             <style>
-              body {{ margin: 0; }}
-              #player {{ width: 1920px; height: 1080px; }}
+            html, body {{
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }}
+            #player {{
+                width: 100vw;
+                height: 100vh;
+            }}
+            .rr-player {{
+                width: 100% !important;
+                height: 100% !important;
+            }}
+            .rr-player__frame {{
+                width: 100% !important;
+                height: calc(100% - 80px) !important;
+            }}
             </style>
-          </head>
-          <body>
+        </head>
+        <body>
             <div id="player"></div>
             <script>
-              window.addEventListener('load', () => {{
+            window.addEventListener('load', () => {{
                 const events = {json.dumps(events)};
                 const replayer = new rrwebPlayer({{
-                  target: document.getElementById('player'),
-                  data: {{
+                target: document.getElementById('player'),
+                data: {{
                     events,
                     autoPlay: true,
-                  }}
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                }}
                 }});
                 window.playerReady = true;
-              }});
+            }});
             </script>
-          </body>
+        </body>
         </html>
         """
 
