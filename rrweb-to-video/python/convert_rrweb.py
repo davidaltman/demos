@@ -11,6 +11,7 @@ import time
 from typing import List, Dict
 import base64
 import ffmpeg
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -85,32 +86,46 @@ class RRWebConverter:
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=options)
 
+    @staticmethod
+    def save_frame(frame_data):
+        """Helper function to save a single frame."""
+        frame_num, screenshot, temp_dir = frame_data
+        frame_path = temp_dir / f"frame_{frame_num:06d}.png"
+        with open(frame_path, 'wb') as f:
+            f.write(base64.b64decode(screenshot))
+        return frame_path
+
     def record_browser(self, duration: float, output_path: str):
         """Record the browser content for the specified duration."""
-        # Create temporary directory for frames
         temp_dir = Path(tempfile.mkdtemp())
         frames_needed = int(duration * self.fps)
         logger.info(f"Recording {frames_needed} frames at {self.fps} FPS")
 
         try:
             frame_files = []
-            for frame_num in range(frames_needed):
-                start_time = time.time()
+            # Use ThreadPoolExecutor for parallel processing
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                futures = []
 
-                # Capture browser screenshot
-                screenshot = self.driver.get_screenshot_as_base64()
+                for frame_num in range(frames_needed):
+                    start_time = time.time()
 
-                # Save frame as PNG
-                frame_path = temp_dir / f"frame_{frame_num:06d}.png"
-                with open(frame_path, 'wb') as f:
-                    f.write(base64.b64decode(screenshot))
-                frame_files.append(frame_path)
+                    # Capture browser screenshot
+                    screenshot = self.driver.get_screenshot_as_base64()
 
-                # Calculate sleep time to maintain FPS
-                elapsed = time.time() - start_time
-                sleep_time = max(0, (1/self.fps) - elapsed)
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
+                    # Submit frame saving task to thread pool
+                    future = executor.submit(self.save_frame, (frame_num, screenshot, temp_dir))
+                    futures.append(future)
+
+                    # Calculate sleep time to maintain FPS
+                    elapsed = time.time() - start_time
+                    sleep_time = max(0, (1/self.fps) - elapsed)
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+
+                # Collect results from futures
+                for future in as_completed(futures):
+                    frame_files.append(future.result())
 
             # Use ffmpeg to combine frames into video
             logger.info("Combining frames into video...")
