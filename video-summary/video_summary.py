@@ -8,6 +8,8 @@ import io
 import base64
 import numpy as np
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 class VideoSummarizer:
     def __init__(self, api_key, api_type="anthropic"):
@@ -79,6 +81,16 @@ class VideoSummarizer:
         """
         encoded_frame = self.encode_frame(frame)
 
+        cursor_prompt = """
+        Please describe what's happening in this frame from a screen recording, focusing specifically on:
+        1. The location and movement of the cursor (shown as a red line/trail)
+        2. Where the cursor came from and where it's going
+        3. Any interactions or clicks the cursor is making
+        4. The context of what's being interacted with on screen
+
+        Keep the description brief but precise about cursor position and movement.
+        """
+
         if self.api_type == "anthropic":
             response = self.client.messages.create(
                 model="claude-3-opus-20240229",
@@ -88,7 +100,7 @@ class VideoSummarizer:
                     "content": [
                         {
                             "type": "text",
-                            "text": "Please provide a brief description of what you see in this image frame from a video."
+                            "text": cursor_prompt
                         },
                         {
                             "type": "image",
@@ -112,7 +124,7 @@ class VideoSummarizer:
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Please provide a brief description of what you see in this image frame from a video."
+                                "text": cursor_prompt
                             },
                             {
                                 "type": "image_url",
@@ -127,28 +139,46 @@ class VideoSummarizer:
             )
             return response.choices[0].message.content
 
-    def summarize_video(self, video_path, sample_rate=30):
+    def process_frame(self, frame, frame_number):
         """
-        Generate a complete summary of the video
+        Process a single frame and return its summary with frame number
+        """
+        try:
+            summary = self.get_frame_summary(frame)
+            print(f"Processed frame {frame_number}")
+            return frame_number, summary
+        except Exception as e:
+            print(f"Error processing frame {frame_number}: {str(e)}")
+            return frame_number, f"Error: {str(e)}"
+
+    def summarize_video(self, video_path, sample_rate=30, max_workers=4):
+        """
+        Generate a complete summary of the video using parallel processing
 
         Args:
             video_path (str): Path to input video file
             sample_rate (int): Sample every nth frame
-
-        Returns:
-            list: List of frame summaries
-            str: Overall video summary
+            max_workers (int): Maximum number of concurrent threads
         """
         frames = self.extract_frames(video_path, sample_rate)
-        frame_summaries = []
+        frame_summaries = [None] * len(frames)  # Pre-allocate list
+        print(f"Processing {len(frames)} frames using {max_workers} threads...")
 
-        print(f"Processing {len(frames)} frames...")
+        # Create a thread pool and process frames concurrently
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all frames for processing
+            future_to_frame = {
+                executor.submit(self.process_frame, frame, i): i
+                for i, frame in enumerate(frames)
+            }
 
-        for i, frame in enumerate(frames):
-            summary = self.get_frame_summary(frame)
-            frame_summaries.append(summary)
-            print(f"Processed frame {i+1}/{len(frames)}")
-            time.sleep(1)  # Rate limiting
+            # Collect results as they complete
+            for future in as_completed(future_to_frame):
+                frame_num, summary = future.result()
+                frame_summaries[frame_num] = summary
+
+        # Remove any None values in frame_summaries
+        frame_summaries = [summary for summary in frame_summaries if summary is not None]
 
         # Generate overall summary
         combined_summary = "\n".join(frame_summaries)
@@ -211,7 +241,8 @@ def main():
     # Process video
     frame_summaries, overall_summary = summarizer.summarize_video(
         video_path,
-        sample_rate=30  # Process 1 frame every second for 30fps video
+        sample_rate=30,  # Process 1 frame every second for 30fps video
+        max_workers=4
     )
 
     # Save results
